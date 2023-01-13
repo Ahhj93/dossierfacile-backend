@@ -4,10 +4,6 @@ import fr.dossierfacile.api.front.exception.ApartmentSharingNotFoundException;
 import fr.dossierfacile.api.front.exception.ApartmentSharingUnexpectedException;
 import fr.dossierfacile.api.front.service.interfaces.ApartmentSharingService;
 import fr.dossierfacile.common.model.apartment_sharing.ApplicationModel;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.UUID;
-import javax.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -18,6 +14,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.UUID;
 
 import static org.springframework.http.ResponseEntity.accepted;
 import static org.springframework.http.ResponseEntity.ok;
@@ -53,6 +54,15 @@ public class ApplicationController {
             } else {
                 log.error(DOCUMENT_NOT_EXIST);
                 response.setStatus(404);
+            }
+        } catch (IllegalStateException e) {
+            log.warn("ApartmentSharing full pdf in not available yet");
+            //response.setStatus(409);
+            try {
+                response.sendError(HttpServletResponse.SC_CONFLICT, "File is not yet available retry later");
+            } catch (IOException ex) {
+                log.error("Oops !", ex);
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             }
         } catch (IOException e) {
             log.error(e.getMessage(), e.getCause());
