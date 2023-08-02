@@ -2,6 +2,9 @@ package fr.dossierfacile.api.pdfgenerator.service;
 
 import fr.dossierfacile.api.pdfgenerator.service.interfaces.PdfGeneratorService;
 import fr.dossierfacile.common.entity.ApartmentSharing;
+import fr.dossierfacile.common.entity.BarCodeDocumentType;
+import fr.dossierfacile.common.entity.BarCodeFileAnalysis;
+import fr.dossierfacile.common.entity.BarCodeType;
 import fr.dossierfacile.common.entity.Document;
 import fr.dossierfacile.common.entity.StorageFile;
 import fr.dossierfacile.common.entity.Tenant;
@@ -9,9 +12,11 @@ import fr.dossierfacile.common.enums.ApplicationType;
 import fr.dossierfacile.common.enums.DocumentCategory;
 import fr.dossierfacile.common.enums.DocumentStatus;
 import fr.dossierfacile.common.enums.DocumentSubCategory;
+import fr.dossierfacile.common.enums.FileAuthenticationStatus;
 import fr.dossierfacile.common.enums.FileStatus;
 import fr.dossierfacile.common.enums.TenantFileStatus;
 import fr.dossierfacile.common.enums.TenantType;
+import fr.dossierfacile.common.repository.DocumentCommonRepository;
 import fr.dossierfacile.common.repository.TenantCommonRepository;
 import fr.dossierfacile.common.service.interfaces.ApartmentSharingCommonService;
 import org.junit.jupiter.api.AfterEach;
@@ -42,10 +47,14 @@ class PdfGeneratorServiceImplTest {
     @MockBean
     TenantCommonRepository tenantRepository;
 
+    @MockBean
+    DocumentCommonRepository documentRepository;
+
     @Value("${mock.storage.path}")
     private String filePath;
 
     private File file;
+    private Document taxDocument;
 
     @Test
     void generateFullDossierPdf() throws IOException {
@@ -55,8 +64,9 @@ class PdfGeneratorServiceImplTest {
 
         Mockito.when(tenantRepository.countTenantsInTheApartmentNotValidatedOrWithSomeNullDocument(1L)).thenReturn(0);
 
-        pdfGeneratorService.generateFullDossierPdf(1L);
+        Mockito.when(documentRepository.findTaxDocumentOfTenant(1L)).thenReturn(taxDocument);
 
+        pdfGeneratorService.generateFullDossierPdf(1L);
 
         Assertions.assertEquals(FileStatus.COMPLETED, apartmentSharing.getDossierPdfDocumentStatus());
         Assertions.assertNotNull( apartmentSharing.getPdfDossierFile());
@@ -129,6 +139,8 @@ class PdfGeneratorServiceImplTest {
         tax.setDocumentStatus(DocumentStatus.VALIDATED);
         tax.setTenant(tenant);
         tax.setWatermarkFile(StorageFile.builder().path("CNI.pdf").build());
+        tax.setFiles(List.of(verifiedTaxFile()));
+        taxDocument = tax;
 
         Document identification = new Document();
         identification.setDocumentCategory(DocumentCategory.IDENTIFICATION);
@@ -145,5 +157,15 @@ class PdfGeneratorServiceImplTest {
         residency.setWatermarkFile(StorageFile.builder().path("CNI.pdf").build());
 
         return List.of(professional, financial, tax, identification, residency);
+    }
+
+    private fr.dossierfacile.common.entity.File verifiedTaxFile() {
+        return fr.dossierfacile.common.entity.File.builder()
+                .fileAnalysis(BarCodeFileAnalysis.builder()
+                        .barCodeType(BarCodeType.TWO_D_DOC)
+                        .documentType(BarCodeDocumentType.TAX_ASSESSMENT)
+                        .authenticationStatus(FileAuthenticationStatus.VALID)
+                        .build())
+                .build();
     }
 }

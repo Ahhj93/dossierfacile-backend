@@ -10,7 +10,7 @@ public enum AuthenticityStatus {
     AUTHENTIC,
     UNKNOWN;
 
-    public static AuthenticityStatus isAuthentic(Document document) {
+    public static AuthenticityStatus getAuthenticityStatus(Document document) {
         if (document.getDocumentCategory() == DocumentCategory.TAX) {
             boolean isAuthentic = document.getFiles().stream()
                     .map(File::getFileAnalysis)
@@ -22,6 +22,10 @@ public enum AuthenticityStatus {
             return fromBoolean(isAuthentic);
         }
         return AuthenticityStatus.UNKNOWN;
+    }
+
+    public static boolean isAuthentic(Document document) {
+        return getAuthenticityStatus(document) == AUTHENTIC;
     }
 
     private static AuthenticityStatus fromBoolean(boolean isAuthentic) {

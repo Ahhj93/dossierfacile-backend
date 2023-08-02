@@ -15,6 +15,7 @@ import fr.dossierfacile.common.enums.ApplicationType;
 import fr.dossierfacile.common.enums.DocumentCategory;
 import fr.dossierfacile.common.enums.TenantType;
 import fr.dossierfacile.common.enums.TypeGuarantor;
+import fr.dossierfacile.common.repository.DocumentCommonRepository;
 import fr.dossierfacile.common.repository.TenantCommonRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,7 +68,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import static fr.dossierfacile.api.pdfgenerator.util.DocumentUtil.*;
+import static fr.dossierfacile.common.entity.AuthenticityStatus.isAuthentic;
 
 @Service
 @AllArgsConstructor
@@ -251,6 +252,7 @@ public class ApartmentSharingPdfDocumentTemplate implements PdfTemplate<Apartmen
     private final TenantCommonRepository tenantRepository;
     private final DownloadService downloadDocumentService;
     private final MessageSource messageSource;
+    private final DocumentCommonRepository documentCommonRepository;
 
     private <T> Predicate<T> distinctByKey(Function<? super T, ?> keyExtractor) {
         Map<Object, Boolean> seen = new ConcurrentHashMap<>();
@@ -991,7 +993,6 @@ public class ApartmentSharingPdfDocumentTemplate implements PdfTemplate<Apartmen
         float lastYLocation = yLocationThirdContentStream;
         //We obtain here the list with the categories, NOT REPEATED (distinctByKey), of documents that the tenant has. Ordered ascending by the ID of DocumentCategory.
         List<DocumentCategory> listOfDocumentCategoryContainedForTenant = tenant.getDocuments().stream().sorted(Comparator.comparing(Document::getDocumentCategory)).filter(distinctByKey(Document::getDocumentCategory)).map(Document::getDocumentCategory).collect(Collectors.toList());
-        boolean hasValid2DDocOnTaxDocument = hasValid2DDocOnTaxDocument(tenant);
         for (DocumentCategory documentCategory : listOfDocumentCategoryContainedForTenant) {
             int numberOfFirstPageForCurrentTypeOfDocument = indexPagesForDocuments.get(iteratorInIndexPagesForDocuments.getAndIncrement() - 1) + 1;
             String indexText = "p." + numberOfFirstPageForCurrentTypeOfDocument + " - " + messageSource.getMessage(documentCategory.getLabel(), null, locale);
@@ -1030,7 +1031,7 @@ public class ApartmentSharingPdfDocumentTemplate implements PdfTemplate<Apartmen
             if (documentCategory == DocumentCategory.FINANCIAL) {
                 yLocationDocFinancialIndex = lastYLocation;
             }
-            if (documentCategory == DocumentCategory.TAX && hasValid2DDocOnTaxDocument) {
+            if (shouldDisplayDGFIPlogoNextToTaxDocument(tenant, documentCategory)) {
                 yLocationDocTaxIndex = lastYLocation;
             }
 
@@ -1112,6 +1113,11 @@ public class ApartmentSharingPdfDocumentTemplate implements PdfTemplate<Apartmen
         }
 
         return lastYLocation;
+    }
+
+    private boolean shouldDisplayDGFIPlogoNextToTaxDocument(Tenant tenant, DocumentCategory documentCategory) {
+        Document taxDocument = documentCommonRepository.findTaxDocumentOfTenant(tenant.getId());
+        return documentCategory == DocumentCategory.TAX && isAuthentic(taxDocument);
     }
 
     private float addIndexesOfDocumentsOfGuarantorInCurrentPage(Guarantor guarantor, int indexPage, List<Integer> indexPagesForDocuments, AtomicInteger iteratorInIndexPagesForDocuments, PDDocument doc, PDType0Font fontLinesOfTitleAndTextOfIncomingGuarantor, PDType0Font fontLinesOfDocumentIndexes, float marginX, float lastYLocation, float xLocationOfEndOfRectangule) throws IOException {
@@ -1325,13 +1331,6 @@ public class ApartmentSharingPdfDocumentTemplate implements PdfTemplate<Apartmen
 
                 Tenant leftTenantInPage = tenantList.get(indexTenant);
                 Tenant rightTenantInPage = (indexTenant + 1) < numberOfTenants ? tenantList.get(indexTenant + 1) : null;
-                leftTenantInPage.getDocuments().forEach(d -> d.getFiles());
-                if (leftTenantInPage.getDocuments() != null) {
-                    leftTenantInPage.getDocuments().forEach(d -> d.getFiles()); // load files in session
-                }
-                if (rightTenantInPage != null && rightTenantInPage.getDocuments() != null) {
-                    rightTenantInPage.getDocuments().forEach(d -> d.getFiles()); // load files in session
-                }
 
                 float yLocationFirstContentStream, yLocationSecondContentStream, yLocationTenantEmailContentStream, yLocationThirdContentStream;
 
